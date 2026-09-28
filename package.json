@@ -1,0 +1,26 @@
+{
+  "name": "recallops-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RecallOps — Incident Memory Agent for Microsoft Hackathon",
+  "scripts": {
+    "dev": "npm run dev --prefix apps/web",
+    "build": "npm run build --prefix apps/web",
+    "api": "python -m uvicorn app.main:app --app-dir services/api --reload --port 8000",
+    "test:api": "python -m pytest services/api/tests -v",
+    "desktop": "npm run dev --prefix apps/desktop"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/desktop"
+  ],
+  "keywords": [
+    "incident-response",
+    "memory-agent",
+    "hindsight",
+    "groq",
+    "microsoft-hackathon"
+  ],
+  "author": "RecallOps SRE Team",
+  "license": "MIT"
+}

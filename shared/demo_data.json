@@ -1,0 +1,300 @@
+{
+  "active_incident": {
+    "incident_id": "INC-2026-0928",
+    "title": "Checkout API latency after deployment",
+    "service": "checkout-api",
+    "severity": "P1",
+    "status": "Investigating",
+    "symptoms": [
+      "p95 latency spike to 8.4s",
+      "5xx HTTP error rate surge to 18.6%",
+      "Redis memory max-eviction threshold alerts",
+      "Connection timeouts between Checkout API and downstream cache"
+    ],
+    "metrics": {
+      "p95_latency_seconds": 8.4,
+      "error_rate_percent": 18.6,
+      "affected_checkout_attempts": 27400,
+      "redis_eviction_rate_ops": 1420,
+      "cpu_utilization_percent": 74.2
+    },
+    "affected_components": [
+      "Checkout API",
+      "Redis Cache",
+      "Azure SQL",
+      "Kubernetes Cluster"
+    ],
+    "recent_changes": [
+      {
+        "component": "checkout-api",
+        "version": "v4.18.2",
+        "description": "Cache configuration release updating Redis connection pool and memory max-limit",
+        "deployed_ago_minutes": 19,
+        "author": "pipeline-bot"
+      }
+    ],
+    "environment": "production-eastus-az",
+    "timestamp": "2026-09-28T14:05:00Z"
+  },
+  "historical_incidents": [
+    {
+      "incident_id": "INC-2025-0417",
+      "title": "Checkout service latency after cache configuration deployment",
+      "service": "checkout-api",
+      "severity": "P1",
+      "match_score": 0.92,
+      "symptoms": [
+        "latency spike",
+        "elevated 5xx errors",
+        "Redis evictions after a configuration release",
+        "downstream saturation"
+      ],
+      "confirmed_root_cause": "Redis max-memory policy and connection-pool configuration caused cache churn and downstream saturation",
+      "successful_resolution": [
+        "roll back the cache configuration",
+        "temporarily scale cache capacity",
+        "validate eviction rate",
+        "gradually restore traffic"
+      ],
+      "failed_mitigation": "restarting Checkout API pods did not resolve the issue.",
+      "runbook_used": "Redis Latency and Eviction Response",
+      "resolution_time_minutes": 18,
+      "elapsed_resolution_minutes": 18,
+      "environment": "production-eastus-az",
+      "timestamp": "2025-04-17T09:12:00Z",
+      "fix_ids": [
+        "FIX-2025-0417-1",
+        "FIX-2025-0417-2",
+        "FIX-2025-0417-3",
+        "FIX-2025-0417-4"
+      ]
+    },
+    {
+      "incident_id": "INC-2025-0812",
+      "title": "Payment authorization delays caused by queue-consumer saturation",
+      "service": "payment-auth",
+      "severity": "P2",
+      "match_score": 0.68,
+      "symptoms": [
+        "payment processing delays",
+        "Kafka queue consumer lag spike",
+        "worker thread pool starvation"
+      ],
+      "confirmed_root_cause": "Consumer thread pool contention during high throughput authorization batch",
+      "successful_resolution": [
+        "scale out consumer deployment replicas",
+        "partition queue traffic across secondary topic",
+        "increase thread pool buffer"
+      ],
+      "failed_mitigation": "purging pending message dead-letter queue caused data inconsistency.",
+      "runbook_used": "Queue Consumer Lag Mitigation Runbook",
+      "resolution_time_minutes": 32,
+      "elapsed_resolution_minutes": 32,
+      "environment": "production-eastus-az",
+      "timestamp": "2025-08-12T16:40:00Z",
+      "fix_ids": [
+        "FIX-2025-0812-1",
+        "FIX-2025-0812-2"
+      ]
+    },
+    {
+      "incident_id": "INC-2024-1105",
+      "title": "Azure SQL connection exhaustion caused by a pool leak and aggressive retry policy",
+      "service": "checkout-api",
+      "severity": "P1",
+      "match_score": 0.74,
+      "symptoms": [
+        "database connection timeouts",
+        "SQL pool exhaustion",
+        "cascading 504 gateway timeouts"
+      ],
+      "confirmed_root_cause": "Unclosed connections in unhandled checkout exception path combined with exponential retry storms",
+      "successful_resolution": [
+        "apply connection pool clamp and circuit breaker",
+        "kill leaked idle backend sessions",
+        "deploy hotfix for connection leak"
+      ],
+      "failed_mitigation": "increasing max pool size to 500 overwhelmed the database CPU.",
+      "runbook_used": "Azure SQL Connection Pool Exhaustion Procedure",
+      "resolution_time_minutes": 45,
+      "elapsed_resolution_minutes": 45,
+      "environment": "production-eastus-az",
+      "timestamp": "2024-11-05T21:15:00Z",
+      "fix_ids": [
+        "FIX-2024-1105-1",
+        "FIX-2024-1105-2"
+      ]
+    }
+  ],
+  "fix_outcomes": [
+    {
+      "fix_id": "FIX-2025-0417-1",
+      "incident_id": "INC-2025-0417",
+      "action_title": "Roll back cache configuration release",
+      "action_description": "Revert Redis connection pool parameters and max-memory policy to v4.18.1 baseline.",
+      "success": true,
+      "status": "Verified",
+      "runbook_id": "RB-REDIS-01",
+      "runbook_title": "Redis Latency and Eviction Response",
+      "historical_success_rate": 0.95,
+      "median_resolution_minutes": 6,
+      "verification_metric": "Eviction ops drop below 10/sec",
+      "evidence_weight": 0.94,
+      "requires_human_approval": true
+    },
+    {
+      "fix_id": "FIX-2025-0417-2",
+      "incident_id": "INC-2025-0417",
+      "action_title": "Restart Checkout API pods (INEFFECTIVE - FAILED MITIGATION)",
+      "action_description": "Rolling restart of Checkout API deployment pods across Kubernetes cluster.",
+      "success": false,
+      "status": "Failed Mitigation",
+      "runbook_id": "RB-K8S-09",
+      "runbook_title": "General Pod Lifecycle Management",
+      "historical_success_rate": 0.08,
+      "median_resolution_minutes": 14,
+      "verification_metric": "Did not resolve eviction or pool exhaustion; introduced additional cold-start latency.",
+      "evidence_weight": 0.95,
+      "is_failed_mitigation": true,
+      "hazard_warning": "CRITICAL HAZARD: Restarting pods under Redis eviction storms causes instant cold cache stampedes and exacerbates p95 latency.",
+      "requires_human_approval": true
+    },
+    {
+      "fix_id": "FIX-2025-0417-3",
+      "incident_id": "INC-2025-0417",
+      "action_title": "Temporarily scale Redis cluster capacity",
+      "action_description": "Scale Redis instance tier from P2 to P3 to provide headroom during configuration rollback.",
+      "success": true,
+      "status": "Verified",
+      "runbook_id": "RB-REDIS-01",
+      "runbook_title": "Redis Latency and Eviction Response",
+      "historical_success_rate": 0.88,
+      "median_resolution_minutes": 5,
+      "verification_metric": "Memory utilization drops under 70%",
+      "evidence_weight": 0.89,
+      "requires_human_approval": true
+    },
+    {
+      "fix_id": "FIX-2025-0417-4",
+      "incident_id": "INC-2025-0417",
+      "action_title": "Validate eviction rate & gradually restore normal traffic limits",
+      "action_description": "Confirm Redis key eviction metrics stabilize at 0 ops/sec before removing temporary throttle.",
+      "success": true,
+      "status": "Verified",
+      "runbook_id": "RB-REDIS-01",
+      "runbook_title": "Redis Latency and Eviction Response",
+      "historical_success_rate": 0.92,
+      "median_resolution_minutes": 7,
+      "verification_metric": "p95 latency returns under 250ms and error rate < 0.1%",
+      "evidence_weight": 0.91,
+      "requires_human_approval": true
+    },
+    {
+      "fix_id": "FIX-2025-0812-1",
+      "incident_id": "INC-2025-0812",
+      "action_title": "Scale queue consumer replicas",
+      "action_description": "Increase HPA minimum replicas for Kafka queue worker service.",
+      "success": true,
+      "status": "Verified",
+      "runbook_id": "RB-QUEUE-03",
+      "runbook_title": "Queue Consumer Lag Mitigation Runbook",
+      "historical_success_rate": 0.86,
+      "median_resolution_minutes": 11,
+      "verification_metric": "Consumer lag decreases to zero",
+      "evidence_weight": 0.72,
+      "requires_human_approval": true
+    },
+    {
+      "fix_id": "FIX-2024-1105-1",
+      "incident_id": "INC-2024-1105",
+      "action_title": "Apply connection pool clamp & circuit breaker",
+      "action_description": "Throttle client connection attempts to Azure SQL to prevent pool thrashing.",
+      "success": true,
+      "status": "Verified",
+      "runbook_id": "RB-SQL-02",
+      "runbook_title": "Azure SQL Connection Pool Exhaustion Procedure",
+      "historical_success_rate": 0.84,
+      "median_resolution_minutes": 15,
+      "verification_metric": "Active database connections stabilize < 80%",
+      "evidence_weight": 0.76,
+      "requires_human_approval": true
+    }
+  ],
+  "team_knowledge": [
+    {
+      "item_id": "TEAM-POL-01",
+      "service": "checkout-api",
+      "owner_team": "Checkout & Payment Experience SRE",
+      "tier1_oncall": "Alice Chen (Primary), Bob Martinez (Secondary)",
+      "escalation_policy": "P1 alerts require on-call engagement within 5 minutes. Bridge channel #incident-checkout-p1.",
+      "operational_constraints": [
+        "All cache configuration changes must go through 5% canary deployment.",
+        "Pod restarts during active eviction storms are prohibited due to stampede risk.",
+        "Production changes during peak retail windows (12:00-18:00 UTC) require SRE lead signoff."
+      ],
+      "updated_at": "2026-09-15T08:00:00Z"
+    }
+  ],
+  "baseline_knowledge": [],
+  "runbooks": [
+    {
+      "runbook_id": "RB-REDIS-01",
+      "title": "Redis Latency and Eviction Response",
+      "service": "redis-cache",
+      "author": "Azure Platform Architecture",
+      "historical_uses": 14,
+      "historical_success_rate": 0.94,
+      "avg_mitigation_time_minutes": 12,
+      "summary": "Standard operating procedure for responding to Redis max-memory eviction cascades and connection pool saturation.",
+      "prerequisites": [
+        "Azure Redis Contributor RBAC",
+        "Kubectl access to production namespace"
+      ],
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Verify Eviction Rate",
+          "command": "az monitor metrics list --resource $REDIS_ID --metric EvictedKeys",
+          "intent": "Confirm whether memory limit policy (allkeys-lru / volatile-lru) is evicting active session keys."
+        },
+        {
+          "step_number": 2,
+          "name": "Roll Back Recent Cache Config Release",
+          "command": "helm rollback checkout-api-config $PREVIOUS_REVISION",
+          "intent": "Immediately revert any newly applied connection-pool or max-memory limits to known good baseline."
+        },
+        {
+          "step_number": 3,
+          "name": "Temporarily Scale Cache Capacity",
+          "command": "az redis update --name $REDIS_NAME --sku Premium --vm-size P3",
+          "intent": "Provide burst buffer memory while cache rewarms."
+        },
+        {
+          "step_number": 4,
+          "name": "Validate Latency Stabilization",
+          "command": "curl -s http://monitoring.internal/api/v1/query?query=checkout_p95_latency",
+          "intent": "Ensure p95 latency falls below 250ms before releasing incident response bridge."
+        }
+      ]
+    },
+    {
+      "runbook_id": "RB-SQL-02",
+      "title": "Azure SQL Connection Pool Exhaustion Procedure",
+      "service": "azure-sql",
+      "author": "Data Platform SRE",
+      "historical_uses": 8,
+      "historical_success_rate": 0.84,
+      "avg_mitigation_time_minutes": 22,
+      "summary": "Procedure for managing database connection leaks, blocking sessions, and retry storms.",
+      "prerequisites": ["SQL DB Owner permissions"],
+      "steps": [
+        {
+          "step_number": 1,
+          "name": "Inspect Active Sessions",
+          "command": "SELECT * FROM sys.dm_exec_requests WHERE status = 'running';",
+          "intent": "Identify long-running uncommitted transactions or pool leaks."
+        }
+      ]
+    }
+  ]
+}

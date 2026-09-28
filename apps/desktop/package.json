@@ -1,0 +1,14 @@
+{
+  "name": "recallops-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RecallOps Desktop Application (Electron Shell)",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^33.2.1"
+  }
+}
