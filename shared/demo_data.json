@@ -5,6 +5,7 @@
     "service": "checkout-api",
     "severity": "P1",
     "status": "Investigating",
+    "impactedUsers": 27400,
     "symptoms": [
       "p95 latency spike to 8.4s",
       "5xx HTTP error rate surge to 18.6%",
@@ -42,6 +43,7 @@
       "title": "Checkout service latency after cache configuration deployment",
       "service": "checkout-api",
       "severity": "P1",
+      "impactedUsers": 18500,
       "match_score": 0.92,
       "symptoms": [
         "latency spike",
@@ -74,6 +76,7 @@
       "title": "Payment authorization delays caused by queue-consumer saturation",
       "service": "payment-auth",
       "severity": "P2",
+      "impactedUsers": 8200,
       "match_score": 0.68,
       "symptoms": [
         "payment processing delays",
@@ -102,6 +105,7 @@
       "title": "Azure SQL connection exhaustion caused by a pool leak and aggressive retry policy",
       "service": "checkout-api",
       "severity": "P1",
+      "impactedUsers": 14200,
       "match_score": 0.74,
       "symptoms": [
         "database connection timeouts",

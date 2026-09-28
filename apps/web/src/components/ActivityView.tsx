@@ -9,15 +9,12 @@ import {
   Terminal,
   Search,
   Filter,
-  ArrowRight,
   Sparkles,
   Bot,
   User,
   Clock,
-  ExternalLink,
   ChevronRight,
   BookOpen,
-  Calendar,
 } from 'lucide-react';
 import { ActivityItem } from '../types';
 

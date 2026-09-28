@@ -101,11 +101,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-1" role="list">
               <button
                 type="button"
-                onClick={() => onSelectView('incident-detail')}
-                aria-label="Navigate to Active Incidents"
-                aria-current={currentView === 'incident-detail' ? 'page' : undefined}
+                onClick={() => onSelectView('incidents')}
+                aria-label="Navigate to Incidents directory"
+                aria-current={currentView === 'incidents' || currentView === 'incident-detail' ? 'page' : undefined}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold transition-all cursor-pointer ${
-                  currentView === 'incident-detail'
+                  currentView === 'incidents' || currentView === 'incident-detail'
                     ? 'bg-brand-600 text-white shadow-md'
                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                 }`}
@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {activeIncidentsCount > 0 && (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      currentView === 'incident-detail'
+                      currentView === 'incidents' || currentView === 'incident-detail'
                         ? 'bg-white/25 text-white'
                         : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
                     }`}

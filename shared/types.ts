@@ -4,7 +4,7 @@
  */
 
 export type SeverityLevel = 'P1' | 'P2' | 'P3' | 'P4';
-export type IncidentStatus = 'Investigating' | 'Mitigated' | 'Resolved' | 'Closed';
+export type IncidentStatus = 'Open' | 'Investigating' | 'Resolving' | 'Resolved' | 'Mitigated' | 'Closed';
 
 export interface IncidentMetricSummary {
   p95_latency_seconds: number;
@@ -55,20 +55,27 @@ export interface IncidentContext {
   service: string;
   severity: SeverityLevel;
   status: IncidentStatus;
+  impactedUsers: number;
+  impacted_users?: number;
   symptoms: string[];
   metrics: IncidentMetricSummary;
   affected_components: string[];
   recent_changes: RecentChange[];
   environment: string;
   timestamp: string;
+  created_at?: string;
+  updated_at?: string;
   owner?: TeamMember;
   assigned_responders?: TeamMember[];
 }
 
 export interface AlertRequest {
+  incident_id?: string;
   title: string;
   service: string;
   severity: SeverityLevel;
+  impactedUsers: number;
+  impacted_users?: number;
   symptoms: string[];
   metrics: IncidentMetricSummary;
   affected_components: string[];

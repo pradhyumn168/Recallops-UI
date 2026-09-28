@@ -6,6 +6,7 @@ from ..models.schemas import (
     AlertRequest,
     AlertResponse,
     IncidentContext,
+    IncidentMetricSummary,
 )
 from ..memory import get_memory_repository, HindsightMemoryRepository
 from ..scoring.outcome_scorer import OutcomeRankedScorer
@@ -37,7 +38,19 @@ async def handle_alert(
     """
     timestamp = request.timestamp or datetime.now(timezone.utc).isoformat()
     # Normalize incident context
-    incident_id = "INC-2026-0928" if "checkout" in request.service.lower() else f"INC-{datetime.now().strftime('%Y-%m%d')}"
+    incident_id = request.incident_id or ("INC-2026-0928" if "checkout" in request.service.lower() else f"INC-{datetime.now().strftime('%Y-%m%d')}")
+    impacted = request.impactedUsers or request.impacted_users or (request.metrics.affected_checkout_attempts if request.metrics else 1000)
+
+    metrics = request.metrics or IncidentMetricSummary(
+        p95_latency_seconds=8.4,
+        error_rate_percent=18.6,
+        affected_checkout_attempts=impacted,
+        redis_eviction_rate_ops=1420.0,
+        cpu_utilization_percent=74.2,
+    )
+
+    affected_components = request.affected_components or [request.service, "Cache", "Database"]
+    recent_changes = request.recent_changes or []
 
     normalized_context = IncidentContext(
         incident_id=incident_id,
@@ -45,16 +58,18 @@ async def handle_alert(
         service=request.service,
         severity=request.severity,
         status="Investigating",
+        impactedUsers=impacted,
+        impacted_users=impacted,
         symptoms=request.symptoms,
-        metrics=request.metrics,
-        affected_components=request.affected_components,
-        recent_changes=request.recent_changes,
+        metrics=metrics,
+        affected_components=affected_components,
+        recent_changes=recent_changes,
         environment=request.environment,
         timestamp=timestamp,
     )
 
     # 1. Recall from Hindsight memory banks
-    query = f"{request.service} {' '.join(request.symptoms)} {' '.join([c.description for c in request.recent_changes])}"
+    query = f"{request.service} {' '.join(request.symptoms)} {' '.join([c.description for c in recent_changes])}"
     try:
         recalled_inc_docs = await memory_repo.recall("incidents", query=query, limit=5)
         recalled_fix_docs = await memory_repo.recall("fix-outcomes", query=query, limit=10)

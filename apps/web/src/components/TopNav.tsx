@@ -1,35 +1,117 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown, Sun, Moon, User, Shield, PhoneCall, LogOut } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import {
+  Search,
+  ChevronDown,
+  Sun,
+  Moon,
+  User,
+  Shield,
+  PhoneCall,
+  LogOut,
+  Layers,
+  Users,
+  AlertCircle,
+  Clock,
+} from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { IncidentContext } from '../types';
 
 interface TopNavProps {
   demoMode?: boolean;
   modelUsed?: string;
   fallbackUsed?: boolean;
+  incidents?: IncidentContext[];
+  onSelectIncident?: (incidentId: string) => void;
   onSearch?: (query: string) => void;
   onOpenArchitecture?: () => void;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
+  incidents = [],
+  onSelectIncident,
   onSearch,
 }) => {
   const [searchVal, setSearchVal] = useState('');
+  const [debouncedVal, setDebouncedVal] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
 
-  // Close dropdown on outside click or ESC key
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedVal(searchVal);
+      onSearch?.(searchVal);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchVal, onSearch]);
+
+  // Filter incidents across multiple fields
+  const searchResults = useMemo(() => {
+    const term = debouncedVal.trim().toLowerCase();
+    if (!term) return [];
+
+    return incidents.filter((inc) => {
+      const idMatch = inc.incident_id.toLowerCase().includes(term);
+      const titleMatch = inc.title.toLowerCase().includes(term);
+      const serviceMatch = inc.service.toLowerCase().includes(term);
+      const severityMatch = inc.severity.toLowerCase().includes(term);
+      const statusMatch = inc.status.toLowerCase().includes(term);
+      const ownerMatch = (inc.owner?.name || '').toLowerCase().includes(term);
+      const responderMatch = (inc.assigned_responders || []).some((r) =>
+        r.name.toLowerCase().includes(term)
+      );
+      const userCount = inc.impactedUsers || inc.metrics?.affected_checkout_attempts || 0;
+      const countMatch =
+        String(userCount).includes(term) ||
+        userCount.toLocaleString().toLowerCase().includes(term) ||
+        (term === 'user' || term === 'users');
+
+      return (
+        idMatch ||
+        titleMatch ||
+        serviceMatch ||
+        severityMatch ||
+        statusMatch ||
+        ownerMatch ||
+        responderMatch ||
+        countMatch
+      );
+    });
+  }, [incidents, debouncedVal]);
+
+  // Reset selected index when results change
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [searchResults]);
+
+  // Handle outside click and keyboard shortcuts
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchOpen(false);
+      }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        setIsSearchOpen(false);
         setIsDropdownOpen(false);
+        searchInputRef.current?.blur();
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -38,25 +120,173 @@ export const TopNav: React.FC<TopNavProps> = ({
     };
   }, []);
 
+  const handleSelectIncidentItem = (incidentId: string) => {
+    onSelectIncident?.(incidentId);
+    setIsSearchOpen(false);
+    setSearchVal('');
+    setSelectedIndex(-1);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSearchOpen || searchResults.length === 0) {
+      if (e.key === 'ArrowDown' && searchVal.trim().length > 0) {
+        setIsSearchOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < searchResults.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : searchResults.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+        handleSelectIncidentItem(searchResults[selectedIndex].incident_id);
+      } else if (searchResults.length > 0) {
+        handleSelectIncidentItem(searchResults[0].incident_id);
+      }
+    }
+  };
+
+  const getSeverityBadgeClass = (sev: string) => {
+    switch (sev) {
+      case 'P1':
+        return 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+      case 'P2':
+        return 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+      case 'P3':
+        return 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800';
+      default:
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'Resolved':
+        return 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+      case 'Resolving':
+        return 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800';
+      case 'Open':
+        return 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+      case 'Investigating':
+      default:
+        return 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800';
+    }
+  };
+
   return (
-    <header className="h-16 bg-white dark:bg-[#111625] border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between sticky top-0 z-20 transition-colors shadow-xs">
-      {/* Search Input */}
-      <div className="relative w-full max-w-md">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-        <input
-          type="text"
-          value={searchVal}
-          onChange={(e) => {
-            setSearchVal(e.target.value);
-            onSearch?.(e.target.value);
-          }}
-          placeholder="Search incidents, services, or agents..."
-          aria-label="Search incidents, services, or agents"
-          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-inner"
-        />
+    <header className="h-16 bg-white dark:bg-[#111625] border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between sticky top-0 z-40 transition-colors shadow-xs">
+      {/* Global Incident Search with Debounced Dropdown */}
+      <div className="relative w-full max-w-lg" ref={searchContainerRef}>
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchVal}
+            onChange={(e) => {
+              setSearchVal(e.target.value);
+              setIsSearchOpen(true);
+            }}
+            onFocus={() => {
+              if (searchVal.trim().length > 0) setIsSearchOpen(true);
+            }}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Search incident ID, title, service, owner, severity, users..."
+            aria-label="Global incident search"
+            aria-expanded={isSearchOpen}
+            aria-haspopup="listbox"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-inner font-medium"
+          />
+        </div>
+
+        {/* Debounced Search Results Dropdown */}
+        {isSearchOpen && searchVal.trim().length > 0 && (
+          <div
+            role="listbox"
+            aria-label="Search suggestions"
+            className="absolute top-full left-0 mt-2 w-full max-h-96 overflow-y-auto bg-white dark:bg-[#161F36] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-xs"
+          >
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+              <span>Matching Incidents ({searchResults.length})</span>
+              <span className="text-[9px] font-mono text-slate-400 font-normal">Use ↑ ↓ to navigate, Enter to select</span>
+            </div>
+
+            {searchResults.length === 0 ? (
+              <div className="p-6 text-center space-y-2">
+                <AlertCircle className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                  No incidents found matching "{searchVal}"
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Search by incident ID (e.g. INC-2026), title, service, status, severity, or impacted users.
+                </p>
+              </div>
+            ) : (
+              searchResults.map((inc, index) => {
+                const isSelected = index === selectedIndex;
+                const userCount = inc.impactedUsers || inc.metrics?.affected_checkout_attempts || 0;
+
+                return (
+                  <div
+                    key={inc.incident_id}
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => handleSelectIncidentItem(inc.incident_id)}
+                    className={`p-3 rounded-xl cursor-pointer transition-all border flex flex-col space-y-1.5 ${
+                      isSelected
+                        ? 'bg-brand-50/70 dark:bg-brand-950/60 border-brand-500 shadow-sm'
+                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-200 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono font-bold text-xs text-brand-600 dark:text-brand-400">
+                          {inc.incident_id}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${getSeverityBadgeClass(inc.severity)}`}>
+                          {inc.severity}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(inc.status)}`}>
+                          {inc.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300 font-bold text-[11px]">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{userCount.toLocaleString()} users</span>
+                      </div>
+                    </div>
+
+                    <div className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+                      {inc.title}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                      <div className="flex items-center space-x-1.5 font-medium">
+                        <Layers className="w-3 h-3 text-slate-400" />
+                        <span>{inc.service}</span>
+                      </div>
+                      {inc.owner && (
+                        <div className="flex items-center space-x-1.5 font-medium">
+                          <span className="text-slate-400 text-[10px]">Owner:</span>
+                          <span className="text-slate-800 dark:text-slate-200 font-semibold">{inc.owner.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Right Controls: Segmented Theme Switcher + Admin Profile Control only */}
+      {/* Right Controls: Segmented Theme Switcher + Admin Profile Control */}
       <div className="flex items-center space-x-4">
         {/* PROMINENT LIGHT / DARK THEME SWITCHER */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700/80 shadow-2xs">
@@ -104,7 +334,7 @@ export const TopNav: React.FC<TopNavProps> = ({
             aria-label="User Profile and Account Menu"
             className="flex items-center space-x-3 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
           >
-            {/* Strict True-Circle Avatar: equal w and h (36px), aspect-square, border-radius: 50% via rounded-full */}
+            {/* Strict True-Circle Avatar: equal w and h (36px), aspect-square, border-radius: 50% */}
             <div className="w-9 h-9 min-w-[36px] min-h-[36px] aspect-square rounded-full shrink-0 flex items-center justify-center font-bold text-xs ring-2 ring-brand-300 dark:ring-brand-700 bg-brand-600 text-white shadow-xs select-none">
               MT
             </div>

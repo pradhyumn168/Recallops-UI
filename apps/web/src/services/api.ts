@@ -57,6 +57,7 @@ class RecallOpsApiClient {
         service: 'checkout-api',
         severity: 'P1',
         status: 'Investigating',
+        impactedUsers: 27400,
         symptoms: [
           'p95 latency spike to 8.4s',
           '5xx HTTP error rate surge to 18.6%',

@@ -25,7 +25,9 @@ class IncidentContext(BaseModel):
     title: str
     service: str
     severity: Literal["P1", "P2", "P3", "P4"] = "P1"
-    status: Literal["Investigating", "Mitigated", "Resolved", "Closed"] = "Investigating"
+    status: Literal["Open", "Investigating", "Resolving", "Mitigated", "Resolved", "Closed"] = "Investigating"
+    impactedUsers: Optional[int] = None
+    impacted_users: Optional[int] = None
     symptoms: List[str]
     metrics: IncidentMetricSummary
     affected_components: List[str]
@@ -37,13 +39,16 @@ class IncidentContext(BaseModel):
 # --- Alert Route Models ---
 
 class AlertRequest(BaseModel):
+    incident_id: Optional[str] = None
     title: str
     service: str
     severity: Literal["P1", "P2", "P3", "P4"] = "P1"
-    symptoms: List[str]
-    metrics: IncidentMetricSummary
-    affected_components: List[str]
-    recent_changes: List[RecentChange]
+    impactedUsers: Optional[int] = None
+    impacted_users: Optional[int] = None
+    symptoms: List[str] = []
+    metrics: Optional[IncidentMetricSummary] = None
+    affected_components: Optional[List[str]] = None
+    recent_changes: Optional[List[RecentChange]] = None
     environment: str = "production-eastus-az"
     timestamp: Optional[str] = None
 

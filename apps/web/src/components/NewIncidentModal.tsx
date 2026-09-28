@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, AlertOctagon, Sparkles, User, Users, Plus, Shield } from 'lucide-react';
+import { X, AlertOctagon, Sparkles, Users, Plus, Shield } from 'lucide-react';
 import { AlertRequest, TeamMember } from '../types';
 
 interface NewIncidentModalProps {
@@ -19,7 +19,8 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
 }) => {
   const [title, setTitle] = useState('Increased error rate on checkout API');
   const [service, setService] = useState('checkout-api');
-  const [severity, setSeverity] = useState<'P1' | 'P2' | 'P3'>('P1');
+  const [severity, setSeverity] = useState<'P1' | 'P2' | 'P3' | 'P4'>('P1');
+  const [impactedUsers, setImpactedUsers] = useState<number | ''>(27400);
   const [symptoms, setSymptoms] = useState(
     'p95 latency spike to 8.4s, 5xx HTTP error rate surge to 18.6%, Redis memory max-eviction alerts'
   );
@@ -64,23 +65,29 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const usersCount = typeof impactedUsers === 'number' && impactedUsers > 0 ? impactedUsers : 1000;
+    const generatedId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const payload: AlertRequest = {
-      title,
-      service,
+      incident_id: generatedId,
+      title: title.trim(),
+      service: service.trim(),
       severity,
-      symptoms: symptoms.split(',').map((s) => s.trim()),
+      impactedUsers: usersCount,
+      impacted_users: usersCount,
+      symptoms: symptoms.split(',').map((s) => s.trim()).filter(Boolean),
       metrics: {
         p95_latency_seconds: 8.4,
         error_rate_percent: 18.6,
-        affected_checkout_attempts: 27400,
+        affected_checkout_attempts: usersCount,
         redis_eviction_rate_ops: 1420,
       },
-      affected_components: ['Checkout API', 'Redis Cache', 'Azure SQL'],
+      affected_components: [service.trim(), 'Redis Cache', 'Azure SQL'],
       recent_changes: [
         {
-          component: 'checkout-api',
+          component: service.trim(),
           version: 'v4.18.2',
-          description: 'Cache configuration release updating Redis connection pool',
+          description: 'Production service configuration release updating connection pool',
           deployed_ago_minutes: 19,
           author: 'pipeline-bot',
         },
@@ -119,7 +126,7 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300">Incident Title</label>
+            <label className="font-bold text-slate-700 dark:text-slate-300">Incident Title <span className="text-rose-500">*</span></label>
             <input
               type="text"
               value={title}
@@ -129,10 +136,10 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
             />
           </div>
 
-          {/* Service & Severity */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Service, Severity & Impacted Users */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="font-bold text-slate-700 dark:text-slate-300">Service</label>
+              <label className="font-bold text-slate-700 dark:text-slate-300">Service <span className="text-rose-500">*</span></label>
               <input
                 type="text"
                 value={service}
@@ -152,7 +159,27 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
                 <option value="P1">P1 - Critical Outage</option>
                 <option value="P2">P2 - Major Degradation</option>
                 <option value="P3">P3 - Minor Issue</option>
+                <option value="P4">P4 - Low Priority</option>
               </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700 dark:text-slate-300">
+                Impacted Users <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                required
+                value={impactedUsers}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setImpactedUsers(val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                }}
+                placeholder="e.g. 8200"
+                className="w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-bold"
+              />
             </div>
           </div>
 
@@ -221,7 +248,6 @@ export const NewIncidentModal: React.FC<NewIncidentModalProps> = ({
                     key={responder.id}
                     className="inline-flex items-center space-x-2 pl-1.5 pr-2 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs hover:border-brand-400 transition-colors"
                   >
-                    {/* Circular avatar: aspect-square, rounded-full */}
                     <div
                       className={`w-6 h-6 min-w-[24px] min-h-[24px] aspect-square rounded-full flex items-center justify-center font-bold text-[10px] text-white shrink-0 ${
                         responder.avatar_color || 'bg-brand-600'

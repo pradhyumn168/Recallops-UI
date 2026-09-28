@@ -34,8 +34,10 @@ interface IncidentDetailViewProps {
   isSendingChat: boolean;
   onOpenResolveModal: () => void;
   onBackToDashboard: () => void;
+  onBackToIncidents?: () => void;
   onInvestigateMemory: () => void;
   isInvestigating: boolean;
+  onUpdateIncidentStatus?: (incidentId: string, newStatus: any) => void;
 }
 
 export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
@@ -47,14 +49,28 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
   isSendingChat,
   onOpenResolveModal,
   onBackToDashboard,
+  onBackToIncidents,
   onInvestigateMemory,
   isInvestigating,
+  onUpdateIncidentStatus,
 }) => {
   const [selectedRemediations, setSelectedRemediations] = useState<string[]>([
     'rem-rollback',
   ]);
   const [chatInput, setChatInput] = useState('');
   const [showChatBox, setShowChatBox] = useState(false);
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const statusMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+        setIsStatusMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleRemediation = (id: string) => {
     setSelectedRemediations((prev) =>
@@ -69,19 +85,34 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
     setChatInput('');
   };
 
+  const handleStatusSelect = (newStatus: string) => {
+    setIsStatusMenuOpen(false);
+    if (newStatus === incident.status) return;
+    if (newStatus === 'Resolved') {
+      onOpenResolveModal();
+    } else {
+      onUpdateIncidentStatus?.(incident.incident_id, newStatus);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Breadcrumb & Navigation */}
       <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
         <button
-          onClick={onBackToDashboard}
-          className="flex items-center space-x-1 text-brand-600 dark:text-brand-400 hover:underline font-bold transition-colors"
+          onClick={onBackToIncidents || onBackToDashboard}
+          className="flex items-center space-x-1 text-brand-600 dark:text-brand-400 hover:underline font-bold transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Dashboard</span>
+          <span>Incidents</span>
         </button>
         <span>/</span>
-        <span>Incidents</span>
+        <button
+          onClick={onBackToDashboard}
+          className="hover:underline text-slate-500 cursor-pointer"
+        >
+          Dashboard
+        </button>
         <span>/</span>
         <span className="font-mono text-slate-800 dark:text-slate-200 font-bold">{incident.incident_id}</span>
       </div>
@@ -98,32 +129,83 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 font-medium">
-            ID: {incident.incident_id} • Created: 12/05/2026, 04:30:00 • Region: {incident.environment}
+            ID: {incident.incident_id} • Created: {new Date(incident.timestamp || '2026-09-28T14:05:00Z').toLocaleString()} • Region: {incident.environment}
           </p>
         </div>
 
         {/* Header Action Buttons */}
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => alert('Bridge channel initialized: #incident-checkout-p1')}
-            className="flex items-center space-x-2 px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#161F36] hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors"
+            onClick={() => alert(`Bridge channel initialized: #incident-${incident.service}-p1`)}
+            className="flex items-center space-x-2 px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#161F36] hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors cursor-pointer"
           >
             <ExternalLink className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
             <span>Slack Channel</span>
           </button>
 
-          <button
-            onClick={onOpenResolveModal}
-            className="flex items-center space-x-2 px-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-[#161F36] hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors"
-          >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                incident.status === 'Resolved' ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'
-              }`}
-            />
-            <span>{incident.status}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-          </button>
+          {/* Interactive Lifecycle Status Menu */}
+          <div className="relative" ref={statusMenuRef}>
+            <button
+              onClick={() => setIsStatusMenuOpen((prev) => !prev)}
+              className="flex items-center space-x-2 px-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-[#161F36] hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors cursor-pointer"
+              aria-label="Change incident lifecycle status"
+              aria-expanded={isStatusMenuOpen}
+            >
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  incident.status === 'Resolved'
+                    ? 'bg-emerald-500'
+                    : incident.status === 'Resolving'
+                    ? 'bg-blue-500 animate-pulse'
+                    : incident.status === 'Open'
+                    ? 'bg-amber-500'
+                    : 'bg-indigo-500 animate-pulse'
+                }`}
+              />
+              <span>{incident.status}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {isStatusMenuOpen && (
+              <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#161F36] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                  Lifecycle Status
+                </div>
+                {[
+                  { id: 'Open', label: 'Open', desc: 'Triage & initial intake', color: 'bg-amber-500' },
+                  { id: 'Investigating', label: 'Investigating', desc: 'Diagnosis & memory recall', color: 'bg-indigo-500' },
+                  { id: 'Resolving', label: 'Resolving', desc: 'Executing mitigations', color: 'bg-blue-500' },
+                  { id: 'Resolved', label: 'Resolved', desc: 'Mitigation verified', color: 'bg-emerald-500' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleStatusSelect(s.id)}
+                    className={`w-full text-left p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center space-x-2.5 cursor-pointer ${
+                      incident.status === s.id ? 'bg-slate-50 dark:bg-slate-800/60 font-bold' : ''
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${s.color} shrink-0`} />
+                    <div className="flex flex-col">
+                      <span className="text-slate-900 dark:text-white font-semibold text-xs leading-tight">
+                        {s.label}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-normal">{s.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {incident.status !== 'Resolved' && (
+            <button
+              onClick={onOpenResolveModal}
+              className="flex items-center space-x-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Mark Resolved</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -206,10 +288,11 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
 
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-1.5">
-            Impact
+            Impacted Users
           </span>
-          <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-            {incident.metrics.affected_checkout_attempts.toLocaleString()} users
+          <div className="text-xs font-bold text-slate-900 dark:text-white truncate flex items-center space-x-1.5">
+            <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>{(incident.impactedUsers || incident.metrics?.affected_checkout_attempts || 0).toLocaleString()} users</span>
           </div>
         </div>
       </div>
