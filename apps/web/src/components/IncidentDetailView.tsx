@@ -381,7 +381,9 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2">
-                    <strong className="font-bold text-slate-900 dark:text-white">Alex Rivera</strong>
+                    <strong className="font-bold text-slate-900 dark:text-white">
+                      {incident.owner?.name || 'Alex Rivera'}
+                    </strong>
                     <span className="text-[10px] font-mono text-slate-700 dark:text-slate-300 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
                       STATUSCHANGE
                     </span>

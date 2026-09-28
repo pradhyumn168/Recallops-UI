@@ -49,6 +49,12 @@ export interface ActivityItem {
   badge_label?: string;
 }
 
+export interface RemediationProgress {
+  checklist: boolean[];
+  resolutionNote: string;
+  assignedOwner?: TeamMember;
+}
+
 export interface IncidentContext {
   incident_id: string;
   title: string;
@@ -67,6 +73,7 @@ export interface IncidentContext {
   updated_at?: string;
   owner?: TeamMember;
   assigned_responders?: TeamMember[];
+  remediationData?: RemediationProgress;
 }
 
 export interface AlertRequest {

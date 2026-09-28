@@ -21,6 +21,7 @@ import {
   AlertRequest,
   TeamMember,
   ActivityItem,
+  RemediationProgress,
 } from './types';
 import { Bot, Brain, Database, Shield, Zap } from 'lucide-react';
 
@@ -667,6 +668,38 @@ export const App: React.FC = () => {
     }
   };
 
+  // Save progress from Remediation Workspace (checklist, resolution note, assigned owner)
+  const handleSaveRemediationProgress = (
+    incidentId: string,
+    progress: RemediationProgress
+  ) => {
+    setIncidents((prev) => {
+      const updated = prev.map((inc) => {
+        if (inc.incident_id === incidentId) {
+          return {
+            ...inc,
+            owner: progress.assignedOwner || inc.owner,
+            remediationData: progress,
+          };
+        }
+        return inc;
+      });
+      try {
+        localStorage.setItem('recallops_incidents', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Error saving remediation progress to localStorage:', e);
+      }
+      return updated;
+    });
+  };
+
+  // Return from remediation directly to the specific incident detail view
+  const handleBackToIncident = (incidentId: string) => {
+    setSelectedIncidentId(incidentId);
+    setIsResolveModalOpen(false);
+    setCurrentView('incident-detail');
+  };
+
   // Create new incident
   const handleNewIncidentSubmit = async (data: AlertRequest) => {
     const usersCount =
@@ -1041,8 +1074,11 @@ export const App: React.FC = () => {
       <ResolveModal
         isOpen={isResolveModalOpen}
         onClose={() => setIsResolveModalOpen(false)}
+        onBackToIncident={handleBackToIncident}
         incident={activeIncident}
+        teamMembers={teamMembers}
         onConfirmResolve={handleConfirmResolve}
+        onSaveProgress={handleSaveRemediationProgress}
         isResolving={isResolving}
       />
 
