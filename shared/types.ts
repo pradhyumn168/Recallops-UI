@@ -22,6 +22,33 @@ export interface RecentChange {
   author: string;
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  team_service: string;
+  on_call_status: 'Primary On-Call' | 'Secondary On-Call' | 'Available' | 'Off-Duty';
+  initials: string;
+  avatar_color?: string;
+  is_lead?: boolean;
+}
+
+export interface ActivityItem {
+  id: string;
+  timestamp: string;
+  category: 'incident' | 'memory' | 'assignment' | 'mitigation' | 'approval' | 'resolution' | 'postmortem';
+  title: string;
+  detail: string;
+  actor: string;
+  actor_role?: string;
+  is_agent?: boolean;
+  incident_id?: string;
+  service?: string;
+  severity?: 'P1' | 'P2' | 'P3' | 'P4';
+  badge_label?: string;
+}
+
 export interface IncidentContext {
   incident_id: string;
   title: string;
@@ -34,6 +61,8 @@ export interface IncidentContext {
   recent_changes: RecentChange[];
   environment: string;
   timestamp: string;
+  owner?: TeamMember;
+  assigned_responders?: TeamMember[];
 }
 
 export interface AlertRequest {
@@ -46,6 +75,8 @@ export interface AlertRequest {
   recent_changes: RecentChange[];
   environment: string;
   timestamp?: string;
+  owner?: TeamMember;
+  assigned_responders?: TeamMember[];
 }
 
 export interface ScoreBreakdown {

@@ -3,7 +3,8 @@ import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 import { DashboardView } from './components/DashboardView';
 import { IncidentDetailView } from './components/IncidentDetailView';
-import { ArchitectureView } from './components/ArchitectureView';
+import { ActivityView } from './components/ActivityView';
+import { TeamView } from './components/TeamView';
 import { ResolveModal } from './components/ResolveModal';
 import { NewIncidentModal } from './components/NewIncidentModal';
 import { api } from './services/api';
@@ -16,7 +17,139 @@ import {
   ResolveRequest,
   ResolveResponse,
   AlertRequest,
+  TeamMember,
+  ActivityItem,
 } from './types';
+import { Bot, Brain, Database, Shield, Zap, Sparkles, Layers, CheckCircle2 } from 'lucide-react';
+
+const INITIAL_TEAM_MEMBERS: TeamMember[] = [
+  {
+    id: 'usr-alice',
+    name: 'Alice Chen',
+    email: 'alice.chen@recallops.internal',
+    role: 'Lead SRE',
+    team_service: 'checkout-service',
+    on_call_status: 'Primary On-Call',
+    initials: 'AC',
+    avatar_color: 'bg-purple-600',
+    is_lead: true,
+  },
+  {
+    id: 'usr-bob',
+    name: 'Bob Martinez',
+    email: 'bob.martinez@recallops.internal',
+    role: 'Secondary SRE',
+    team_service: 'Data Platform',
+    on_call_status: 'Secondary On-Call',
+    initials: 'BM',
+    avatar_color: 'bg-teal-600',
+    is_lead: false,
+  },
+  {
+    id: 'usr-alex',
+    name: 'Alex Rivera',
+    email: 'alex.rivera@recallops.internal',
+    role: 'Incident Commander',
+    team_service: 'Platform Ops',
+    on_call_status: 'Primary On-Call',
+    initials: 'AR',
+    avatar_color: 'bg-indigo-600',
+    is_lead: true,
+  },
+  {
+    id: 'usr-sarah',
+    name: 'Sarah Chen',
+    email: 'sarah.chen@recallops.internal',
+    role: 'Platform Engineer',
+    team_service: 'Core Infrastructure',
+    on_call_status: 'Available',
+    initials: 'SC',
+    avatar_color: 'bg-emerald-600',
+    is_lead: false,
+  },
+  {
+    id: 'usr-mike',
+    name: 'Mike Ross',
+    email: 'mike.ross@recallops.internal',
+    role: 'Security Responder',
+    team_service: 'Payment Gateway',
+    on_call_status: 'Off-Duty',
+    initials: 'MR',
+    avatar_color: 'bg-amber-600',
+    is_lead: false,
+  },
+];
+
+const INITIAL_ACTIVITIES: ActivityItem[] = [
+  {
+    id: 'act-1',
+    timestamp: '10 min ago',
+    category: 'incident',
+    title: 'P1 Outage alert triggered on checkout-service',
+    detail: 'p95 latency spike to 8.4s and 5xx HTTP error rate surge to 18.6% across 27,400 checkout attempts.',
+    actor: 'Metrics Agent',
+    is_agent: true,
+    incident_id: 'INC-2026-0928',
+    service: 'checkout-service',
+    severity: 'P1',
+  },
+  {
+    id: 'act-2',
+    timestamp: '9 min ago',
+    category: 'assignment',
+    title: 'Response team assigned to INC-2026-0928',
+    detail: 'Alex Rivera assigned as Lead Incident Commander. Alice Chen (Primary SRE) and Bob Martinez (Secondary SRE) dispatched.',
+    actor: 'Team Dispatcher',
+    actor_role: 'Operations',
+    incident_id: 'INC-2026-0928',
+    service: 'checkout-service',
+    severity: 'P1',
+  },
+  {
+    id: 'act-3',
+    timestamp: '7 min ago',
+    category: 'memory',
+    title: 'Hindsight Memory Bank matched historical incident INC-2025-0417',
+    detail: 'RecallOps pattern match (92% confidence) recalled root cause: Redis max-memory eviction cascade. Retrieved 3 ranked mitigations.',
+    actor: 'RecallOps Agent',
+    is_agent: true,
+    incident_id: 'INC-2026-0928',
+    service: 'checkout-service',
+  },
+  {
+    id: 'act-4',
+    timestamp: '4 min ago',
+    category: 'approval',
+    title: 'Lead human approved rollback of checkout-api v4.18.2',
+    detail: 'Alex Rivera authorized remediation action #rem-rollback. Briefing Guard verified citation integrity against recalled INC-2025-0417 evidence.',
+    actor: 'Alex Rivera',
+    actor_role: 'Incident Commander',
+    incident_id: 'INC-2026-0928',
+    service: 'checkout-service',
+  },
+  {
+    id: 'act-5',
+    timestamp: '3 min ago',
+    category: 'mitigation',
+    title: 'Briefing Guard enforced historical hazard constraint',
+    detail: 'Historical failure notice enforced: Pod restart mitigation was prohibited due to active eviction cascades causing node blackout in 2025.',
+    actor: 'Briefing Guard',
+    is_agent: true,
+    incident_id: 'INC-2026-0928',
+    service: 'checkout-service',
+  },
+  {
+    id: 'act-6',
+    timestamp: '2 days ago',
+    category: 'postmortem',
+    title: 'Incident INC-2025-0417 post-mortem retained in memory bank',
+    detail: 'Knowledge successfully committed to fix_outcomes bank. Runbook cache-saturation-recovery updated (+0.12 reliability delta).',
+    actor: 'Hindsight Memory System',
+    is_agent: true,
+    incident_id: 'INC-2025-0417',
+    service: 'redis-cache-cluster',
+  },
+];
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -30,10 +163,26 @@ export const App: React.FC = () => {
   const [memoryStats, setMemoryStats] = useState<MemoryBankStats>({
     incidents_count: 3,
     fix_outcomes_count: 6,
-    team_count: 1,
+    team_count: 5,
     baseline_count: 0,
     mode: 'DEMO_LOCAL',
   });
+
+  // Team state with localStorage persistence
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
+    try {
+      const saved = localStorage.getItem('recallops_team_members');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Error reading saved team members:', e);
+    }
+    return INITIAL_TEAM_MEMBERS;
+  });
+
+  // Activity state with live updates
+  const [activities, setActivities] = useState<ActivityItem[]>(INITIAL_ACTIVITIES);
 
   // Incident state
   const [incident, setIncident] = useState<IncidentContext>({
@@ -67,6 +216,8 @@ export const App: React.FC = () => {
     ],
     environment: 'eastus-az',
     timestamp: '2026-09-28T14:05:00Z',
+    owner: INITIAL_TEAM_MEMBERS[2], // Alex Rivera
+    assigned_responders: [INITIAL_TEAM_MEMBERS[0], INITIAL_TEAM_MEMBERS[1]], // Alice Chen, Bob Martinez
   });
 
   const [briefing, setBriefing] = useState<GroundedBriefing | null>(null);
@@ -87,7 +238,11 @@ export const App: React.FC = () => {
         ]);
         setDemoMode(health.demo_mode);
         setModelUsed(health.llm_primary_model);
-        setIncident(activeInc);
+        setIncident((prev) => ({
+          ...activeInc,
+          owner: prev.owner,
+          assigned_responders: prev.assigned_responders,
+        }));
         setMemoryStats(stats);
       } catch (e) {
         console.warn('Initial backend load fallback:', e);
@@ -95,6 +250,30 @@ export const App: React.FC = () => {
     }
     loadInitial();
   }, []);
+
+  // Handle Add Team Member
+  const handleAddTeamMember = (member: TeamMember) => {
+    const updated = [member, ...teamMembers];
+    setTeamMembers(updated);
+    try {
+      localStorage.setItem('recallops_team_members', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Error saving team members to localStorage:', e);
+    }
+
+    // Append to activity log
+    const newActivity: ActivityItem = {
+      id: `act-${Date.now()}-team`,
+      timestamp: 'Just now',
+      category: 'assignment',
+      title: `New team responder onboarded: ${member.name}`,
+      detail: `${member.name} (${member.role}) joined ${member.team_service} with availability status "${member.on_call_status}".`,
+      actor: 'Mike Taylor',
+      actor_role: 'Platform SRE Admin',
+      service: member.team_service,
+    };
+    setActivities((prev) => [newActivity, ...prev]);
+  };
 
   // Trigger Investigation Flow: POST /api/alerts
   const handleInvestigateMemory = async () => {
@@ -171,6 +350,33 @@ export const App: React.FC = () => {
       setIncident((prev) => ({ ...prev, status: 'Resolved' }));
       const newStats = await api.getMemoryStats();
       setMemoryStats(newStats);
+
+      // Append resolution & post-mortem events to activity log
+      const resEvent: ActivityItem = {
+        id: `act-${Date.now()}-res`,
+        timestamp: 'Just now',
+        category: 'resolution',
+        title: `Incident ${incident.incident_id} marked Resolved`,
+        detail: `Confirmed root cause: ${payload.confirmed_root_cause}. Runbook used: ${payload.runbook_used}. System metrics normalized.`,
+        actor: 'Mike Taylor',
+        actor_role: 'Platform SRE Admin',
+        incident_id: incident.incident_id,
+        service: incident.service,
+      };
+
+      const retentionEvent: ActivityItem = {
+        id: `act-${Date.now()}-retention`,
+        timestamp: 'Just now',
+        category: 'postmortem',
+        title: `Resolution retained in Hindsight fix_outcomes memory bank`,
+        detail: `Retained fixes: ${res.memory_update_summary?.retained_fixes_count || 1}. Runbook reliability delta: +${res.memory_update_summary?.runbook_reliability_delta || 0.15}. Estimated ${res.memory_update_summary?.estimated_minutes_saved || 54} minutes saved for future occurrences.`,
+        actor: 'Hindsight Memory System',
+        is_agent: true,
+        incident_id: incident.incident_id,
+        service: incident.service,
+      };
+
+      setActivities((prev) => [resEvent, retentionEvent, ...prev]);
       return res;
     } catch (err) {
       console.error('Resolve error:', err);
@@ -182,8 +388,9 @@ export const App: React.FC = () => {
 
   // Create new incident
   const handleNewIncidentSubmit = async (data: AlertRequest) => {
+    const newIncidentId = `INC-2026-0928`;
     const newContext: IncidentContext = {
-      incident_id: 'INC-2026-0928',
+      incident_id: newIncidentId,
       title: data.title,
       service: data.service,
       severity: data.severity,
@@ -194,8 +401,43 @@ export const App: React.FC = () => {
       recent_changes: data.recent_changes,
       environment: data.environment,
       timestamp: new Date().toISOString(),
+      owner: data.owner,
+      assigned_responders: data.assigned_responders,
     };
     setIncident(newContext);
+
+    // Append to Activity feed: Response team assigned to INC-2026-XXXX
+    const responderNames = (data.assigned_responders || []).map((r) => r.name).join(', ') || 'Alice Chen, Bob Martinez';
+    const ownerName = data.owner?.name || 'Alex Rivera';
+
+    const assignmentEvent: ActivityItem = {
+      id: `act-${Date.now()}-assign`,
+      timestamp: 'Just now',
+      category: 'assignment',
+      title: `Response team assigned to ${newIncidentId}`,
+      detail: `Incident Commander ${ownerName} assigned as Lead Owner. Dispatched response team: ${responderNames}.`,
+      actor: 'Team Dispatcher',
+      actor_role: 'Operations',
+      incident_id: newIncidentId,
+      service: data.service,
+      severity: data.severity,
+    };
+
+    const alertEvent: ActivityItem = {
+      id: `act-${Date.now()}-alert`,
+      timestamp: 'Just now',
+      category: 'incident',
+      title: `Incident alert triggered on ${data.service}`,
+      detail: `${data.title} • Severity: ${data.severity} • Symptoms: ${data.symptoms.join(', ')}`,
+      actor: 'Metrics Agent',
+      is_agent: true,
+      incident_id: newIncidentId,
+      service: data.service,
+      severity: data.severity,
+    };
+
+    setActivities((prev) => [assignmentEvent, alertEvent, ...prev]);
+
     await handleInvestigateMemory();
     setCurrentView('incident-detail');
   };
@@ -219,17 +461,21 @@ export const App: React.FC = () => {
           onSearch={(q) => {
             if (q.toLowerCase().includes('checkout') || q.toLowerCase().includes('inc')) {
               setCurrentView('incident-detail');
+            } else if (q.toLowerCase().includes('team') || q.toLowerCase().includes('alice') || q.toLowerCase().includes('alex')) {
+              setCurrentView('team');
+            } else if (q.toLowerCase().includes('activity') || q.toLowerCase().includes('log')) {
+              setCurrentView('activity');
             }
           }}
-          onOpenArchitecture={() => setCurrentView('architecture')}
         />
 
         {/* Page Content */}
         <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
+          {/* DASHBOARD VIEW */}
           {currentView === 'dashboard' && (
             <DashboardView
               activeIncident={incident}
-              onSelectIncident={(id) => {
+              onSelectIncident={() => {
                 if (!briefing) handleInvestigateMemory();
                 setCurrentView('incident-detail');
               }}
@@ -238,6 +484,19 @@ export const App: React.FC = () => {
             />
           )}
 
+          {/* DEDICATED ACTIVITY VIEW */}
+          {currentView === 'activity' && (
+            <ActivityView
+              activities={activities}
+              onSelectIncident={(id) => {
+                if (!briefing) handleInvestigateMemory();
+                setCurrentView('incident-detail');
+              }}
+              onOpenNewIncident={() => setIsNewIncidentModalOpen(true)}
+            />
+          )}
+
+          {/* INCIDENT DETAIL VIEW */}
           {currentView === 'incident-detail' && (
             <IncidentDetailView
               incident={incident}
@@ -253,23 +512,15 @@ export const App: React.FC = () => {
             />
           )}
 
-          {currentView === 'architecture' && (
-            <ArchitectureView
-              memoryStats={memoryStats}
-              demoMode={demoMode}
-              modelUsed={modelUsed}
+          {/* DEDICATED TEAM MANAGEMENT VIEW */}
+          {currentView === 'team' && (
+            <TeamView
+              teamMembers={teamMembers}
+              onAddTeamMember={handleAddTeamMember}
             />
           )}
 
-          {currentView === 'activity' && (
-            <DashboardView
-              activeIncident={incident}
-              onSelectIncident={() => setCurrentView('incident-detail')}
-              onOpenNewIncident={() => setIsNewIncidentModalOpen(true)}
-              memoryStats={memoryStats}
-            />
-          )}
-
+          {/* SERVICES DIRECTORY VIEW */}
           {currentView === 'services' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-[#161F36] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg transition-colors">
@@ -282,9 +533,13 @@ export const App: React.FC = () => {
                   >
                     <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
                       <span>checkout-service</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">P1 Outage</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                        {incident.status === 'Resolved' ? 'Resolved' : 'P1 Outage'}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">p95: 8.4s • Error rate: 18.6%</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
+                      {incident.status === 'Resolved' ? 'p95: 140ms • Nominal' : 'p95: 8.4s • Error rate: 18.6%'}
+                    </p>
                   </div>
 
                   <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 transition-colors shadow-2xs">
@@ -298,42 +553,87 @@ export const App: React.FC = () => {
                   <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 transition-colors shadow-2xs">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
                       <span>redis-cache-cluster</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">Evicting</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        {incident.status === 'Resolved' ? 'Recovered' : 'Evicting'}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">1,420 evictions/s • P2 tier</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
+                      {incident.status === 'Resolved' ? '0 evictions/s • Normal' : '1,420 evictions/s • P2 tier'}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
+          {/* AGENTS & MEMORY VIEW (NO ARCHITECTURE SCREEN) */}
           {currentView === 'agents' && (
-            <ArchitectureView
-              memoryStats={memoryStats}
-              demoMode={demoMode}
-              modelUsed={modelUsed}
-            />
-          )}
-
-          {currentView === 'team' && (
-            <div className="bg-white dark:bg-[#161F36] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg space-y-4 transition-colors">
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Platform SRE Team & Policies</h1>
-              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Escalation policies recalled from Hindsight team memory bank</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2 transition-colors">
-                  <h4 className="font-bold text-slate-900 dark:text-white">Primary On-Call Rotation</h4>
-                  <p className="text-slate-700 dark:text-slate-300 font-medium">• Alice Chen (Primary Lead) - #incident-checkout-p1</p>
-                  <p className="text-slate-700 dark:text-slate-300 font-medium">• Bob Martinez (Secondary SRE)</p>
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-[#161F36] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg space-y-4 transition-colors">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-950/80 text-brand-600 dark:text-brand-400 flex items-center justify-center border border-brand-200 dark:border-brand-900">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                      RecallOps Agent & Memory Banks
+                    </h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                      Autonomous decision support agents and Hindsight memory bank telemetry
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2 transition-colors">
-                  <h4 className="font-bold text-slate-900 dark:text-white">Mandatory Operational Constraints</h4>
-                  <p className="text-slate-700 dark:text-slate-300 font-medium">• Cache configuration releases require 5% canary deployment.</p>
-                  <p className="text-rose-600 dark:text-rose-400 font-bold">• Pod restarts under active eviction cascades are strictly prohibited.</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Incidents Bank</span>
+                      <Database className="w-4 h-4 text-brand-500" />
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                      {memoryStats.incidents_count}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Historical Outages</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Fix Outcomes Bank</span>
+                      <Brain className="w-4 h-4 text-purple-500" />
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                      {memoryStats.fix_outcomes_count}
+                    </div>
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">Ranked Mitigations</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Team Memory Bank</span>
+                      <Shield className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                      {teamMembers.length}
+                    </div>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Responders & Policies</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Briefing Guard</span>
+                      <Zap className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                      Strict
+                    </div>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Anti-hallucination ON</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
+          {/* SETTINGS VIEW */}
           {currentView === 'settings' && (
             <div className="bg-white dark:bg-[#161F36] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg space-y-4 transition-colors">
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Settings & API Configuration</h1>
@@ -362,7 +662,7 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* 3. Modal Dialogs matching Screenshot 4 */}
+      {/* 3. Modal Dialogs */}
       <ResolveModal
         isOpen={isResolveModalOpen}
         onClose={() => setIsResolveModalOpen(false)}
@@ -376,6 +676,7 @@ export const App: React.FC = () => {
         onClose={() => setIsNewIncidentModalOpen(false)}
         onSubmit={handleNewIncidentSubmit}
         isLoading={isInvestigating}
+        teamMembers={teamMembers}
       />
     </div>
   );

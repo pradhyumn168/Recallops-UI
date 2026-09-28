@@ -6,6 +6,7 @@ import {
   Filter,
   Bot,
   User,
+  Users,
   Terminal,
   Activity,
   Zap,
@@ -127,7 +128,7 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
       </div>
 
       {/* Metadata Context Row */}
-      <div className="bg-white dark:bg-[#161F36] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg grid grid-cols-2 md:grid-cols-4 gap-6 transition-colors">
+      <div className="bg-white dark:bg-[#161F36] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg grid grid-cols-2 md:grid-cols-5 gap-4 transition-colors">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-1.5">
             Status
@@ -148,20 +149,58 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
             Service
           </span>
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-900 dark:text-white">
-            <Layers className="w-4 h-4 text-slate-400" />
-            <span>{incident.service}</span>
+            <Layers className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="truncate">{incident.service}</span>
           </div>
         </div>
 
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-1.5">
-            Assignee
+            Incident Owner (Lead)
           </span>
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-900 dark:text-white">
-            <div className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
-              AR
+            <div className="w-6 h-6 min-w-[24px] min-h-[24px] aspect-square rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs shrink-0 select-none">
+              {incident.owner?.initials || 'AR'}
             </div>
-            <span>Alex Rivera</span>
+            <span className="truncate">{incident.owner?.name || 'Alex Rivera'}</span>
+          </div>
+        </div>
+
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-1.5">
+            Response Team
+          </span>
+          <div className="flex items-center space-x-1.5">
+            {(incident.assigned_responders && incident.assigned_responders.length > 0) ? (
+              <div className="flex items-center -space-x-1.5 overflow-hidden">
+                {incident.assigned_responders.map((resp) => (
+                  <div
+                    key={resp.id}
+                    title={`${resp.name} (${resp.role})`}
+                    className={`w-6 h-6 min-w-[24px] min-h-[24px] aspect-square rounded-full border-2 border-white dark:border-[#161F36] flex items-center justify-center text-[9px] font-bold text-white shadow-2xs select-none ${
+                      resp.avatar_color || 'bg-slate-600'
+                    }`}
+                  >
+                    {resp.initials}
+                  </div>
+                ))}
+                <span className="pl-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {incident.assigned_responders.length} assigned
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center -space-x-1.5">
+                <div className="w-6 h-6 min-w-[24px] min-h-[24px] aspect-square rounded-full bg-purple-600 text-white border-2 border-white dark:border-[#161F36] flex items-center justify-center text-[9px] font-bold">
+                  AC
+                </div>
+                <div className="w-6 h-6 min-w-[24px] min-h-[24px] aspect-square rounded-full bg-teal-600 text-white border-2 border-white dark:border-[#161F36] flex items-center justify-center text-[9px] font-bold">
+                  BM
+                </div>
+                <span className="pl-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  2 assigned
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -169,8 +208,8 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-1.5">
             Impact
           </span>
-          <div className="text-xs font-bold text-slate-900 dark:text-white">
-            User facing <span className="text-slate-500 dark:text-slate-400 font-normal">({incident.metrics.affected_checkout_attempts.toLocaleString()} checkouts)</span>
+          <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+            {incident.metrics.affected_checkout_attempts.toLocaleString()} users
           </div>
         </div>
       </div>
@@ -226,6 +265,27 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
                 </div>
                 <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
                   Incident created. Status: Open. Paged on-call Alice Chen.
+                </p>
+              </div>
+            </div>
+
+            {/* Event 2.5: Response Team Assigned */}
+            <div className="relative flex items-start space-x-4">
+              <div className="absolute -left-6 w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-2 border-white dark:border-[#161F36] flex items-center justify-center shadow-xs">
+                <Users className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-2">
+                    <strong className="font-bold text-slate-900 dark:text-white">Team Dispatcher</strong>
+                    <span className="text-[10px] font-mono text-blue-700 dark:text-blue-300 font-bold bg-blue-100 dark:bg-blue-950/80 px-2 py-0.5 rounded border border-blue-300 dark:border-blue-800">
+                      TEAMASSIGNED
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">04:32:00</span>
+                </div>
+                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                  Response team assigned to {incident.incident_id}: <strong className="text-slate-900 dark:text-white">{incident.owner?.name || 'Alex Rivera'}</strong> (Lead Commander), {incident.assigned_responders && incident.assigned_responders.length > 0 ? incident.assigned_responders.map(r => r.name).join(', ') : 'Alice Chen, Bob Martinez'}.
                 </p>
               </div>
             </div>
